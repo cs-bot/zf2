@@ -269,6 +269,17 @@ class InformationSchemaMetadata implements MetadataInterface
         $column->setCharacterOctetLength($columnInfo['CHARACTER_OCTET_LENGTH']);
         $column->setNumericPrecision($columnInfo['NUMERIC_PRECISION']);
         $column->setNumericScale($columnInfo['NUMERIC_SCALE']);
+
+        if (isset($columnInfo['COLUMN_TYPE']) &&
+            preg_match('/^(?:enum|set)\((.+)\)/i', $columnInfo['COLUMN_TYPE'], $matches)) {
+            $values = $matches[1];
+            if (preg_match_all("/'((?:[^']*'')*[^']*)'\\s*,/", $values . ',', $matches, PREG_PATTERN_ORDER)) {
+                $values = str_replace("''", "'", $matches[1]);
+            } else {
+                $values = array($values);
+            }
+            $column->setErrata('permitted_values', $values);
+        }
         return $column;
     }
 
@@ -445,6 +456,9 @@ class InformationSchemaMetadata implements MetadataInterface
             'NUMERIC_SCALE',
         );
 
+        if ($platform->getName() == 'MySQL') {
+            $isColumns[] = 'COLUMN_TYPE';
+        }
         array_walk($isColumns, function (&$c) use ($platform) { $c = $platform->quoteIdentifier($c); });
 
         $sql = 'SELECT ' . implode(', ', $isColumns)
